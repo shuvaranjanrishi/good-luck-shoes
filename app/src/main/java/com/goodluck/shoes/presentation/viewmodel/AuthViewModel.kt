@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.goodluck.shoes.data.models.User
 import com.goodluck.shoes.data.models.UserRole
+import com.goodluck.shoes.data.preferences.SessionManager
 import com.goodluck.shoes.domain.usecase.auth.LoginUseCase
 import com.goodluck.shoes.domain.usecase.auth.RegisterUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,7 +23,8 @@ data class AuthState(
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
-    private val registerUseCase: RegisterUseCase
+    private val registerUseCase: RegisterUseCase,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
     private val _authState = MutableStateFlow(AuthState())
@@ -32,6 +34,12 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _authState.value = AuthState(isLoading = true)
             loginUseCase(email, password).onSuccess { user ->
+                sessionManager.saveSession(
+                    userId = user.id,
+                    userName = user.name,
+                    userEmail = user.email,
+                    userRole = user.role
+                )
                 _authState.value = AuthState(
                     isLoading = false,
                     isSuccess = true,
@@ -51,11 +59,12 @@ class AuthViewModel @Inject constructor(
         email: String,
         phone: String,
         password: String,
-        role: UserRole
+        role: UserRole,
+        address: String = ""
     ) {
         viewModelScope.launch {
             _authState.value = AuthState(isLoading = true)
-            registerUseCase(name, email, phone, password, role).onSuccess {
+            registerUseCase(name, email, phone, password, role, address).onSuccess {
                 _authState.value = AuthState(
                     isLoading = false,
                     isSuccess = true
@@ -66,6 +75,13 @@ class AuthViewModel @Inject constructor(
                     error = error.message ?: "Registration failed"
                 )
             }
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            sessionManager.clearSession()
+            _authState.value = AuthState()
         }
     }
 
